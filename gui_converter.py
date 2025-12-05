@@ -176,7 +176,7 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("AI Document Converter Ultra")
+        self.title("MarkForge | GPU AI Converter")
         self.geometry("900x650")
 
         # Layout Config
