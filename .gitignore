@@ -1,0 +1,34 @@
+# --- Python & Cache ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+evn
+.env
+.venv
+
+# --- Environments ---
+# Ignore micromamba/conda/venv environments
+env/
+venv/
+.conda/
+
+# --- Project Data (Important!) ---
+# Never commit your input documents or output results
+in/
+out/
+Knowledge/
+Markdown_Knowledge/
+
+# --- Temporary/Crash Files ---
+# Ignore the temp chunks created during splitting
+*_temp_chunk_*.pdf
+
+# --- IDE Settings ---
+.vscode/
+.idea/
+
+# --- System ---
+Thumbs.db
+Desktop.ini
