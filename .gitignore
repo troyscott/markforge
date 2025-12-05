@@ -7,7 +7,7 @@ __pycache__/
 evn
 .env
 .venv
-
+backup
 # --- Environments ---
 # Ignore micromamba/conda/venv environments
 env/

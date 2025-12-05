@@ -1,76 +1,76 @@
 # AI Document Converter (GPU-Accelerated)
 
-This project provides a robust, GPU-accelerated pipeline to convert PDF, Word, Excel, and PowerPoint documents into clean Markdown. It utilizes **Surya-OCR** and **Marker** for high-fidelity PDF extraction and **MarkItDown** for Office documents.
+A robust, GPU-accelerated pipeline to convert PDF, Word, Excel, and PowerPoint documents into clean Markdown. 
+
+Features **Surya-OCR** and **Marker** for high-fidelity PDF extraction (tables, equations, layout) and **MarkItDown** for Office documents. Includes both a **Modern GUI** and a headless **CLI** for automation.
+
+## 📂 Project Structure
+
+* `gui_converter.py`: **(Recommended)** The modern graphical interface. Features dark mode, folder selection, and non-freezing background processing.
+* `cli_converter.py`: The headless script. Best for servers or automated batch jobs.
+* `cleanup.py`: A maintenance tool to wipe the output folder and remove stray temporary files.
 
 ## 📋 Prerequisites
 
 * **OS:** Windows 10/11
-* **Interface:** Command Prompt (cmd.exe)
-* **GPU:** NVIDIA GPU with updated drivers.
-* **Package Manager:** [Micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) (Assumed installed and in your PATH).
+* **GPU:** NVIDIA GPU (Required for reasonable performance).
+* **Manager:** [Micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html).
 
-## 🛠️ Environment Setup
+## 🛠️ Installation
 
-We use `micromamba` to ensure clean handling of Python dependencies and GPU libraries without administrative privileges.
+### 1. Create Environment
 
-### 1. Create the Environment
-
-Open your Command Prompt (`cmd`) and run the following commands one by one:
+Open Command Prompt (`cmd`) and run:
 
 ```cmd
-:: Create a fresh environment with Python 3.10
+:: Create environment
 micromamba create -n doc-convert python=3.10 -c conda-forge -y
 
-:: Activate the environment
+:: Activate
 micromamba activate doc-convert
 ````
 
-### 2\. Install PyTorch with CUDA (Critical)
+### 2\. Install PyTorch (CUDA)
 
-To ensure the AI models use your GPU instead of your CPU, we must install the CUDA-enabled version of PyTorch first.
+**Critical:** You must install the CUDA version of PyTorch to use your GPU.
 
 ```cmd
-:: Install PyTorch for CUDA 12.1 (Standard for modern GPUs)
 pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu121](https://download.pytorch.org/whl/cu121)
 ```
 
-### 3\. Install Application Dependencies
-
-Now install the converter libraries.
+### 3\. Install Dependencies
 
 ```cmd
-pip install marker-pdf markitdown pymupdf pillow
+pip install customtkinter marker-pdf markitdown pymupdf pillow
 ```
 
 -----
 
 ## 🚀 How to Run
 
-### 1\. Prepare your folders
+### Option A: The GUI (Easiest)
 
-Ensure your directory looks like this:
-
-```text
-\ProjectRoot
-  ├── convert.py           # The main script
-  ├── cleanup.py           # The cleanup script
-  ├── \in                  # PUT YOUR FILES HERE (PDF, DOCX, etc.)
-  └── \out                 # Results will appear here
-```
-
-### 2\. Execute the Converter
-
-Run the main script. It will automatically detect your GPU and start processing.
+Launch the graphical interface to select folders and watch the log in real-time.
 
 ```cmd
-python convert.py
+python gui_converter.py
 ```
 
-*Note: The first time you run this, it will download several GBs of AI models. This is normal.*
+1. Click **Select Input Folder** (Put your PDFs/Docs here).
+2. Click **Select Output Folder**.
+3. Click **START CONVERSION**.
 
-### 3\. Cleaning Up
+### Option B: The CLI (Automated)
 
-If you want to clear the output folder and reset for a fresh batch:
+Run the headless script. *Ensure you edit the `INPUT_DIR` and `OUTPUT_DIR` paths inside the script first.*
+
+```cmd
+python cli_converter.py
+```
+
+### 🧹 Maintenance
+
+To clean up the `/out` directory and remove any temporary chunks left behind after a crash:
 
 ```cmd
 python cleanup.py
@@ -78,14 +78,6 @@ python cleanup.py
 
 ## ⚠️ Troubleshooting
 
-**"OSError: Page file too small" or Out of Memory:**
-If processing large batches, ensure `convert.py` is configured with `MAX_PAGES_PER_CHUNK = 25` (or lower).
-
-**GPU not being used:**
-Run this command to check if CUDA is active:
-
-```cmd
-python -c "import torch; print(torch.cuda.is_available())"
-```
-
-If it says `False`, reinstall the PyTorch step above.
+* **"OSError: Page file too small":** If you crash on huge files, ensure `MAX_PAGES_PER_CHUNK` is set to 25 or lower in the script.
+  * **Stuck Logs:** If the GUI logs look messy with progress bars, ensure you are using the latest version of `gui_converter.py` with the "Smart Filter" enabled.
+  

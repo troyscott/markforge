@@ -6,7 +6,8 @@ DESCRIPTION:   A modern graphical interface for the GPU-accelerated
                
                Features:
                - Drag-and-drop style folder selection
-               - Real-time log monitoring
+               - Configurable Chunk Size (Speed vs Stability)
+               - Smart Log Filtering (No messy progress bars)
                - Background processing (Anti-Freeze)
                - Dark Mode UI
                
@@ -26,44 +27,40 @@ from pathlib import Path
 from PIL import Image
 
 # --- IMPORT AI LIBRARIES (Wrapped to prevent GUI freeze on import) ---
-# We import these later in the thread or globally if fast enough. 
-# For this script, global is fine as long as we don't load models yet.
 from markitdown import MarkItDown
 from marker.models import load_all_models
 from marker.convert import convert_single_pdf
 
-# --- CONFIGURATION & CONSTANTS ---
-ctk.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
-ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
-MAX_PAGES_PER_CHUNK = 25
+# --- CONFIGURATION ---
+ctk.set_appearance_mode("Dark") 
+ctk.set_default_color_theme("blue") 
 
 # --- SMART LOGGING REDIRECTOR ---
 class TextRedirector(object):
     """Redirects print() to GUI but filters out messy progress bars."""
     def __init__(self, text_widget):
         self.text_widget = text_widget
-        self.buffer = ""
 
     def write(self, string):
         # 1. Filter out known "noisy" progress bar patterns
         if "it/s]" in string or "%|" in string or "it/s" in string:
             return
         
-        # 2. Filter out raw carriage returns (the \r characters used by progress bars)
+        # 2. Filter out raw carriage returns
         if string == "\r" or string.startswith("\r"):
             return
 
         # 3. Only show clean, non-empty messages
         if string.strip():
             self.text_widget.configure(state="normal")
-            self.text_widget.insert("end", string + "\n") # Force new line for clarity
+            self.text_widget.insert("end", string + "\n")
             self.text_widget.see("end") 
             self.text_widget.configure(state="disabled")
 
     def flush(self):
         pass
 
-# --- CORE LOGIC (Copied from your stable script) ---
+# --- CORE LOGIC ---
 def split_pdf(input_path, chunk_size):
     temp_files = []
     try:
@@ -72,7 +69,7 @@ def split_pdf(input_path, chunk_size):
             if total_pages <= chunk_size:
                 return [input_path]
 
-            print(f"   ✂️  Splitting {input_path.name} ({total_pages} pages)...")
+            print(f"   ✂️  Splitting {input_path.name} ({total_pages} pages) into {chunk_size}-page chunks...")
             for i in range(0, total_pages, chunk_size):
                 end_page = min(i + chunk_size, total_pages)
                 with pymupdf.open() as new_doc:
@@ -86,8 +83,9 @@ def split_pdf(input_path, chunk_size):
         return [input_path]
     return temp_files
 
-def convert_pdf_safely(input_path, current_output_dir, model_list):
-    files_to_process = split_pdf(input_path, MAX_PAGES_PER_CHUNK)
+def convert_pdf_safely(input_path, current_output_dir, model_list, chunk_size):
+    # Pass chunk_size dynamically
+    files_to_process = split_pdf(input_path, chunk_size)
     full_markdown = ""
     doc_folder_name = input_path.stem.replace(" ", "_")
     images_dir = current_output_dir / "images" / doc_folder_name
@@ -128,7 +126,7 @@ def convert_office(input_path, md_converter):
         print(f"   [!] Office error: {e}")
         return None
 
-def process_logic(source_root, dest_root, model_list, md_converter):
+def process_logic(source_root, dest_root, model_list, md_converter, chunk_size):
     source_root = Path(source_root)
     dest_root = Path(dest_root)
     
@@ -146,23 +144,32 @@ def process_logic(source_root, dest_root, model_list, md_converter):
             output_file_name = f"{input_file_path.stem}.md"
             output_file_path = current_dest_dir / output_file_name
 
-            if output_file_path.exists():
-                print(f"⏭️  Skipping {file} (Done)")
-                continue
+            # 1. Force overwrite (Optional: comment this out if you want to skip existing)
+            # if output_file_path.exists():
+            #     print(f"⏭️  Skipping {file} (File exists)")
+            #     continue
 
             print(f"Processing: {file}...")
-            markdown_content = None
+            markdown_content = "" # Default to empty string
             ext = input_file_path.suffix.lower()
 
             if ext == ".pdf":
-                markdown_content = convert_pdf_safely(input_file_path, current_dest_dir, model_list)
+                markdown_content = convert_pdf_safely(input_file_path, current_dest_dir, model_list, chunk_size)
             elif ext in [".docx", ".pptx", ".xlsx"]:
                 markdown_content = convert_office(input_file_path, md_converter)
             
-            if markdown_content:
+            # 2. SAVE REGARDLESS of content
+            # Even if text is empty, we want the file so we know it processed.
+            try:
                 with open(output_file_path, "w", encoding="utf-8") as f:
-                    f.write(markdown_content)
-                print(f"   ✅ Saved {output_file_path.name}")
+                    f.write(markdown_content if markdown_content else "")
+                
+                if not markdown_content:
+                    print(f"   ⚠️ Warning: No text extracted, but saved empty file.")
+                
+                print(f"   ✅ Saved: {output_file_path.absolute()}")
+            except Exception as e:
+                print(f"   ❌ Error saving file: {e}")
 
 # --- GUI APPLICATION CLASS ---
 class App(ctk.CTk):
@@ -170,11 +177,11 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title("AI Document Converter Ultra")
-        self.geometry("800x600")
+        self.geometry("900x650")
 
         # Layout Config
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=1) # Log box grows
 
         # 1. Header
         self.header_frame = ctk.CTkFrame(self)
@@ -198,13 +205,24 @@ class App(ctk.CTk):
         self.lbl_output = ctk.CTkLabel(self.controls_frame, text="No folder selected", text_color="gray")
         self.lbl_output.grid(row=1, column=1, padx=10, sticky="w")
 
-        # Start Button
-        self.btn_start = ctk.CTkButton(self.controls_frame, text="START CONVERSION", fg_color="green", hover_color="darkgreen", command=self.start_thread)
-        self.btn_start.grid(row=2, column=0, columnspan=2, pady=20, sticky="ew")
+        # 3. Advanced Settings Frame (Chunk Slider)
+        self.settings_frame = ctk.CTkFrame(self)
+        self.settings_frame.grid(row=2, column=0, padx=20, pady=5, sticky="ew")
+        
+        self.lbl_slider = ctk.CTkLabel(self.settings_frame, text="Chunk Size: 25 Pages (Safe)", font=ctk.CTkFont(weight="bold"))
+        self.lbl_slider.pack(pady=(10,0))
+        
+        self.slider_chunk = ctk.CTkSlider(self.settings_frame, from_=10, to=100, number_of_steps=90, command=self.update_slider_label)
+        self.slider_chunk.set(25) # Default safe value
+        self.slider_chunk.pack(fill="x", padx=50, pady=(0, 10))
 
-        # 3. Log Window
-        self.textbox = ctk.CTkTextbox(self, width=760, height=300)
-        self.textbox.grid(row=2, column=0, padx=20, pady=20, sticky="nsew")
+        # Start Button
+        self.btn_start = ctk.CTkButton(self.settings_frame, text="START CONVERSION", fg_color="green", hover_color="darkgreen", height=40, command=self.start_thread)
+        self.btn_start.pack(padx=20, pady=10, fill="x")
+
+        # 4. Log Window
+        self.textbox = ctk.CTkTextbox(self, width=860, height=300)
+        self.textbox.grid(row=3, column=0, padx=20, pady=20, sticky="nsew")
         self.textbox.configure(state="disabled")
 
         # Variables
@@ -227,34 +245,39 @@ class App(ctk.CTk):
             self.output_dir = path
             self.lbl_output.configure(text=f".../{os.path.basename(path)}")
 
+    def update_slider_label(self, value):
+        val = int(value)
+        desc = "(Safe)" if val <= 30 else "(Faster)" if val <= 60 else "(High RAM!)"
+        self.lbl_slider.configure(text=f"Chunk Size: {val} Pages {desc}")
+
     def start_thread(self):
         if not self.input_dir or not self.output_dir:
             print("⚠️ Please select both Input and Output folders first.")
             return
         
-        self.btn_start.configure(state="disabled", text="Processing...")
+        chunk_val = int(self.slider_chunk.get())
+        self.btn_start.configure(state="disabled", text=f"Processing (Chunk: {chunk_val})...")
         
-        # Run in separate thread to keep GUI alive
-        thread = threading.Thread(target=self.run_conversion)
+        # Run in separate thread
+        thread = threading.Thread(target=self.run_conversion, args=(chunk_val,))
         thread.start()
 
-    def run_conversion(self):
+    def run_conversion(self, chunk_size):
         try:
             print("-" * 30)
-            print("🚀 Initializing AI Models (This may take a moment)...")
+            print("🚀 Initializing AI Models...")
             
-            # Load Models INSIDE the thread (safe because we are already in __main__)
+            # Load Models
             marker_model_list = load_all_models()
             md_converter = MarkItDown()
             
-            print("✅ Models Loaded. Starting Batch...")
-            process_logic(self.input_dir, self.output_dir, marker_model_list, md_converter)
+            print(f"✅ Models Loaded. Starting Batch with chunk size {chunk_size}...")
+            process_logic(self.input_dir, self.output_dir, marker_model_list, md_converter, chunk_size)
             
             print("\n✨ ALL TASKS COMPLETED SUCCESSFULLY!")
         except Exception as e:
             print(f"\n❌ CRITICAL ERROR: {e}")
         finally:
-            # Re-enable button (must be done via main thread in strict environments, but usually safe in CTK)
             self.btn_start.configure(state="normal", text="START CONVERSION")
 
 if __name__ == "__main__":
