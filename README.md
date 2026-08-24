@@ -26,11 +26,11 @@ MarkForge pins Python 3.12. Do not use the macOS system Python or Micromamba for
 
 ## Setup with uv
 
-The PyPI distribution is named `markforge-docs`; the installed commands and
-Python package remain `markforge`:
+The distribution is named `markforge-docs`; the installed commands and Python
+package remain `markforge`. Install the current GitHub prerelease directly:
 
 ```shell
-uv tool install markforge-docs
+uv tool install https://github.com/troyscott/markforge/releases/download/v0.2.1/markforge_docs-0.2.1-py3-none-any.whl
 markforge --help
 ```
 
