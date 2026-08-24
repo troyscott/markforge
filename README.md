@@ -1,83 +1,193 @@
-# AI Document Converter (GPU-Accelerated)
+# MarkForge
 
-A robust, GPU-accelerated pipeline to convert PDF, Word, Excel, and PowerPoint documents into clean Markdown. 
+MarkForge is a local, cross-platform document-to-Markdown converter. It uses Marker for high-fidelity PDF layout, tables, equations, OCR, and images, and MarkItDown for Word, PowerPoint, and Excel files.
 
-Features **Surya-OCR** and **Marker** for high-fidelity PDF extraction (tables, equations, layout) and **MarkItDown** for Office documents. Includes both a **Modern GUI** and a headless **CLI** for automation.
+Large PDFs can be exported as NotebookLM-friendly chapter files while smaller internal page chunks keep GPU and unified-memory use predictable. Documents stay on your computer: MarkForge has no cloud extraction, telemetry, or API-key requirement.
 
-## 📂 Project Structure
+## Highlights
 
-* `gui_converter.py`: **(Recommended)** The modern graphical interface. Features dark mode, folder selection, and non-freezing background processing.
-* `cli_converter.py`: The headless script. Best for servers or automated batch jobs.
-* `cleanup.py`: A maintenance tool to wipe the output folder and remove stray temporary files.
+- Chapter discovery from PDF bookmarks or visible chapter headings
+- Fixed-page fallback when a PDF has no usable structure
+- Separate logical chapters and memory-safe processing chunks
+- Apple Metal (MPS), NVIDIA CUDA, and CPU support
+- Extracted images with portable relative Markdown links
+- Per-document `manifest.json` with page coverage, hashes, status, and errors
+- Resume, forced reprocessing, adaptive chunk splitting, and CPU fallback
+- CLI and CustomTkinter desktop interfaces backed by one conversion engine
+- DOCX, PPTX, XLSX, TXT, and recursive folder conversion
 
-## 📋 Prerequisites
+## Requirements
 
-* **OS:** Windows 10/11
-* **GPU:** NVIDIA GPU (Required for reasonable performance).
-* **Manager:** [Micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html).
+- macOS, Windows, or Linux
+- [`uv`](https://docs.astral.sh/uv/)
+- Sufficient free disk space for local model downloads and converted images
 
-## 🛠️ Installation
+MarkForge pins Python 3.12. Do not use the macOS system Python or Micromamba for this project.
 
-### 1. Create Environment
+## Setup with uv
 
-Open Command Prompt (`cmd`) and run:
-
-```cmd
-:: Create environment
-micromamba create -n doc-convert python=3.10 -c conda-forge -y
-
-:: Activate
-micromamba activate doc-convert
-````
-
-### 2\. Install PyTorch (CUDA)
-
-**Critical:** You must install the CUDA version of PyTorch to use your GPU.
-
-```cmd
-pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu121](https://download.pytorch.org/whl/cu121)
+```shell
+git clone https://github.com/troyscott/markforge.git
+cd markforge
+uv python install 3.12
+uv sync --all-extras
 ```
 
-### 3\. Install Dependencies
+The first Marker conversion downloads its local models. Later runs reuse the model cache.
 
-```cmd
-pip install customtkinter marker-pdf markitdown pymupdf pillow
+Marker 2 uses a local Surya inference server when a page needs OCR or layout
+recovery. On macOS and CPU-only Linux, install the local `llama.cpp` backend:
+
+```shell
+brew install llama.cpp
 ```
 
------
+Clean digital PDFs may convert without starting this backend, but installing it
+prevents difficult pages, equations, and scanned content from failing midway.
+No cloud OCR service or API key is used.
 
-## 🚀 How to Run
+Verify the environment:
 
-### Option A: The GUI (Easiest)
-
-Launch the graphical interface to select folders and watch the log in real-time.
-
-```cmd
-python gui_converter.py
+```shell
+uv run markforge --help
+uv run pytest
+uv lock --check
 ```
 
-1. Click **Select Input Folder** (Put your PDFs/Docs here).
-2. Click **Select Output Folder**.
-3. Click **START CONVERSION**.
+Use `uv run --locked` in repeatable or automated workflows:
 
-### Option B: The CLI (Automated)
-
-Run the headless script. *Ensure you edit the `INPUT_DIR` and `OUTPUT_DIR` paths inside the script first.*
-
-```cmd
-python cli_converter.py
+```shell
+uv sync --locked --all-extras
+uv run --locked pytest
 ```
 
-### 🧹 Maintenance
+## Inspect before converting
 
-To clean up the `/out` directory and remove any temporary chunks left behind after a crash:
+Inspection does not load Marker models or convert the PDF. It reports page count, selectable-text coverage, bookmarks, proposed chapter files, and the detected device.
 
-```cmd
-python cleanup.py
+```shell
+uv run markforge inspect /path/to/book.pdf
 ```
 
-## ⚠️ Troubleshooting
+For an unusual bookmark hierarchy:
 
-* **"OSError: Page file too small":** If you crash on huge files, ensure `MAX_PAGES_PER_CHUNK` is set to 25 or lower in the script.
-  * **Stuck Logs:** If the GUI logs look messy with progress bars, ensure you are using the latest version of `gui_converter.py` with the "Smart Filter" enabled.
-  
+```shell
+uv run markforge inspect /path/to/book.pdf --toc-level 2
+```
+
+## Convert
+
+```shell
+uv run markforge convert /path/to/book.pdf --output /path/to/markdown
+```
+
+Defaults:
+
+- Chapter-oriented output
+- Bookmarks, then detected headings, then 25-page output groups
+- 20-page internal processing chunks
+- Automatic MPS, CUDA, or CPU selection
+- Resume enabled
+- No combined full-book file
+
+Useful options:
+
+```shell
+# Always create 30-page Markdown files
+uv run markforge convert book.pdf --output out --split pages --output-pages 30
+
+# Create chapter files plus an optional combined copy
+uv run markforge convert book.pdf --output out --combined
+
+# Force CPU or reprocess completed chapters
+uv run markforge convert book.pdf --output out --device cpu --force
+
+# Fast embedded-text conversion when layout/OCR is unnecessary
+uv run markforge convert book.pdf --output out --extractor native
+
+# Recursively convert a folder
+uv run markforge convert documents --output converted
+```
+
+Every source receives its own output directory. A PDF named `fabric-book.pdf` produces:
+
+```text
+out/
+  fabric-book/
+    manifest.json
+    01-front-matter.md
+    02-chapter-1-introduction.md
+    03-chapter-2-storage.md
+    images/
+      fabric-book/
+```
+
+Physical PDF pages in the manifest are one-based. Long chapters remain one Markdown file even when MarkForge processes them in several smaller PDF chunks.
+
+## Desktop application
+
+```shell
+uv run markforge gui
+```
+
+The desktop interface supports file or folder input, structure preview, device selection, chapter/page/single output, progress, optional combined output, and cancellation between processing chunks.
+
+## Device behavior
+
+Marker chooses the device in this order: CUDA, Apple MPS, then CPU. Override it with `--device` when diagnosing a conversion.
+
+### macOS / Apple Silicon
+
+- Use the uv-managed arm64 Python 3.12 environment.
+- Install `llama.cpp` with Homebrew so Marker can start its local OCR server.
+- Keep processing at the 20-page default initially.
+- If an MPS operation fails, MarkForge reduces the chunk size and retries the smallest failed chunk on CPU.
+
+### Windows / NVIDIA
+
+- Install current NVIDIA drivers before `uv sync`.
+- Confirm detection with `uv run markforge inspect sample.pdf`.
+- MarkForge preserves CUDA support, but a release should only claim CUDA verification after a real NVIDIA smoke test.
+
+### CPU
+
+CPU conversion is supported but slower. Use `--device cpu` when acceleration is unavailable or for troubleshooting. Marker OCR on CPU also requires the `llama-server` binary supplied by `llama.cpp`.
+
+## Resume and safety
+
+- Source documents are never modified or deleted.
+- Temporary PDFs live in MarkForge-owned per-run directories under the output document.
+- Markdown and manifests are replaced atomically.
+- A command exits non-zero when any segment fails, while preserving successful output and failure details for retry.
+- Successful chapters are skipped when the source hash and conversion configuration match.
+- Changed inputs or settings invalidate the previous run.
+- `cleanup.py OUTPUT` removes only stale `.markforge-*` temporary directories.
+
+Keep copyrighted source documents and converted output private. The repository ignores `in/`, `out/`, local environments, caches, temporary pieces, PDFs, and Office documents.
+
+## Dependency maintenance
+
+Use uv rather than editing the lockfile:
+
+```shell
+uv add PACKAGE
+uv remove PACKAGE
+uv lock --upgrade-package PACKAGE
+uv lock --check
+```
+
+Commit both `pyproject.toml` and `uv.lock` after a reviewed dependency change.
+
+## Development
+
+```shell
+uv sync --all-extras
+uv run pytest
+uv run markforge inspect tests/fixtures/example.pdf
+```
+
+Routine CI uses synthetic PDFs and mocked extractors so it does not download production models. Local integration testing validates Marker on real hardware.
+
+## License
+
+MIT

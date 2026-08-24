@@ -18,6 +18,12 @@ venv/
 # Never commit your input documents or output results
 in/
 out/
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.markforge-*/
+dist/
 Knowledge/
 Markdown_Knowledge/
 
