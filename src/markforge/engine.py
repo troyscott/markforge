@@ -336,6 +336,7 @@ class ConversionEngine:
     ) -> tuple[str, int, list[str]]:
         markdown = result.markdown
         count = 0
+        warnings: list[str] = []
         for name, image in result.images.items():
             destination = image_root / Path(name).name
             image.save(destination)
@@ -349,11 +350,22 @@ class ConversionEngine:
                 lambda match: match.group(1).strip(),
                 markdown,
             )
-        warnings = (
-            [f"Removed {len(empty_images)} empty image reference(s) emitted by the extractor"]
-            if empty_images
-            else []
-        )
+            warnings.append(f"Removed {len(empty_images)} empty image reference(s) emitted by the extractor")
+
+        document_tags = re.findall(r"</?(?:html|body)\b[^>]*>", markdown, flags=re.IGNORECASE)
+        if document_tags:
+            markdown = re.sub(r"</?(?:html|body)\b[^>]*>", "", markdown, flags=re.IGNORECASE)
+            warnings.append(
+                f"Removed {len(document_tags)} document-level HTML tag(s) emitted by the extractor"
+            )
+
+        for tag in ("sup", "p"):
+            opening = len(re.findall(rf"<{tag}(?:\s[^>]*)?>", markdown, flags=re.IGNORECASE))
+            closing = len(re.findall(rf"</{tag}>", markdown, flags=re.IGNORECASE))
+            if opening != closing:
+                warnings.append(
+                    f"Unbalanced <{tag}> tags remain in extracted Markdown; manual review required"
+                )
         return markdown, count, warnings
 
     def _convert_non_pdf(self, source: Path, output: Path, options: ConversionOptions) -> Path:

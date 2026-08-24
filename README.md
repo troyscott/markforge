@@ -142,6 +142,13 @@ uv run markforge gui
 
 The desktop interface supports file or folder input, structure preview, device selection, chapter/page/single output, progress, optional combined output, and cancellation between processing chunks.
 
+Keyboard shortcuts keep the primary workflow available without relying on the mouse:
+
+| Action | macOS | Windows and Linux |
+| --- | --- | --- |
+| Preview structure | `Command-P` | `Ctrl-P` |
+| Start conversion | `Command-R` | `Ctrl-R` |
+
 ## Device behavior
 
 Marker chooses the device in this order: CUDA, Apple MPS, then CPU. Override it with `--device` when diagnosing a conversion.

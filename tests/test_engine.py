@@ -117,3 +117,22 @@ def test_empty_image_references_are_removed(tmp_path):
     assert markdown == "Before useful alt after "
     assert image_count == 0
     assert warnings == ["Removed 2 empty image reference(s) emitted by the extractor"]
+
+
+def test_document_html_is_removed_and_unbalanced_inline_tags_warn(tmp_path):
+    result = ExtractionResult(
+        markdown="Before <body><p>converted text</p></body></html></sup>",
+        images={},
+    )
+    segment = Segment("segment-001", "Chapter", 1, 1, "01-chapter.md")
+
+    markdown, image_count, warnings = ConversionEngine._save_images(
+        result, tmp_path / "images", tmp_path, segment
+    )
+
+    assert markdown == "Before <p>converted text</p></sup>"
+    assert image_count == 0
+    assert warnings == [
+        "Removed 3 document-level HTML tag(s) emitted by the extractor",
+        "Unbalanced <sup> tags remain in extracted Markdown; manual review required",
+    ]

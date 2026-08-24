@@ -33,6 +33,7 @@ class MarkForgeApp(ctk.CTk):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(4, weight=1)
         self._build_ui()
+        self._bind_shortcuts()
         self.after(100, self._drain_events)
 
     def _build_ui(self) -> None:
@@ -79,6 +80,12 @@ class MarkForgeApp(ctk.CTk):
         self.log.grid(row=4, column=0, padx=18, pady=(8, 18), sticky="nsew")
         self.log.configure(state="disabled")
 
+    def _bind_shortcuts(self) -> None:
+        for sequence in ("<Command-p>", "<Control-p>"):
+            self.bind(sequence, lambda _event: self._preview())
+        for sequence in ("<Command-r>", "<Control-r>"):
+            self.bind(sequence, lambda _event: self._start())
+
     def _select_input_file(self) -> None:
         value = filedialog.askopenfilename(filetypes=[("Documents", "*.pdf *.docx *.pptx *.xlsx *.txt"), ("All files", "*")])
         if value:
@@ -94,7 +101,7 @@ class MarkForgeApp(ctk.CTk):
         if value:
             self.output_var.set(value)
 
-    def _options(self) -> ConversionOptions:
+    def _conversion_options(self) -> ConversionOptions:
         return ConversionOptions(
             output_dir=Path(self.output_var.get() or "out"), split=self.split_var.get(),
             processing_pages=int(self.processing_var.get()), output_pages=int(self.output_pages_var.get()),
@@ -107,7 +114,7 @@ class MarkForgeApp(ctk.CTk):
             self._append("Preview requires a PDF file.")
             return
         try:
-            self._append(json.dumps(ConversionEngine().inspect(source, self._options()).to_dict(), indent=2, ensure_ascii=False))
+            self._append(json.dumps(ConversionEngine().inspect(source, self._conversion_options()).to_dict(), indent=2, ensure_ascii=False))
         except Exception as exc:
             self._append(f"Preview failed: {exc}")
 
@@ -117,7 +124,7 @@ class MarkForgeApp(ctk.CTk):
             self._append("Select a valid input and output folder.")
             return
         try:
-            options = self._options()
+            options = self._conversion_options()
             options.validate()
         except Exception as exc:
             self._append(f"Invalid options: {exc}")
