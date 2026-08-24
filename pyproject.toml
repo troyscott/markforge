@@ -1,17 +1,34 @@
 [project]
-name = "markforge"
-version = "0.2.0"
+name = "markforge-docs"
+version = "0.2.1"
 description = "Local, cross-platform document-to-Markdown conversion with chapter-aware PDF splitting"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = "MIT"
 authors = [{ name = "Troy Scott" }]
+keywords = ["markdown", "ocr", "pdf", "document-conversion", "notebooklm"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Environment :: MacOS X",
+  "Intended Audience :: End Users/Desktop",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Text Processing :: Markup :: Markdown",
+]
 dependencies = [
   "customtkinter>=5.2.2,<6",
   "marker-pdf>=2.0.0,<3",
   "markitdown[docx,pptx,xlsx]>=0.1.3,<0.2",
   "pymupdf>=1.24,<2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/troyscott/markforge"
+Repository = "https://github.com/troyscott/markforge"
+Issues = "https://github.com/troyscott/markforge/issues"
 
 [dependency-groups]
 dev = [
